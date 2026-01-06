@@ -16,24 +16,17 @@ from ui.settings import Header, Text, Divider, Input
 from android.graphics import Typeface, Color
 import sys
 
-# Импорты через sys.modules, так как лоадер их туда уже положил
+# Импорты через sys.modules
 Config = sys.modules['config'].Config
 LyricsManager = sys.modules['lyrics_controller'].LyricsManager
-# download_file и get_icon_id возьмем из utils
 utils = sys.modules['utils']
 download_file = utils.download_file
 get_icon_id = utils.get_icon_id
 
-# ======================================================
-# КОНСТАНТЫ
-# ======================================================
 DEX_URL = "https://github.com/Hazzz895/ExteraPluginsAssets/raw/refs/heads/main/lyrics/dex/classes.dex"
 CONTROLLER_CLASS_NAME = "com.pessdes.lyrics.components.lrclib.LyricsController"
 SHOW_LYRICS_ITEM_ID = 6767
 
-# ======================================================
-# ОСНОВНОЙ КЛАСС ПЛАГИНА
-# ======================================================
 class Plugin(BasePlugin):
     def __init__(self):
         self.config = Config()
@@ -100,9 +93,6 @@ class Plugin(BasePlugin):
             except:
                 pass
 
-# ======================================================
-# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ И ХУКИ
-# ======================================================
 def is_music():
     playing = get_media_controller().getInstance().getPlayingMessageObject()
     return playing and playing.isMusic()
