@@ -1,11 +1,3 @@
-__id__ = "lyrics_pro"
-__name__ = "Lyrics Pro"
-__version__ = "2.2.0"
-__author__ = "@PESSDES_Plugins"
-__description__ = "Улучшенная версия Lyrics с кастомизацией обоев, шрифтов и размеров текста. (All-in-one version)"
-__icon__ = "VoiceToText7/12"
-__min_version__ = "11.12.1"
-
 import os
 import json
 import requests
@@ -22,6 +14,15 @@ from org.telegram.ui.Components import AudioPlayerAlert
 from ui.bulletin import BulletinHelper
 from ui.settings import Header, Text, Divider, Input
 from android.graphics import Typeface, Color
+import sys
+
+# Импорты через sys.modules, так как лоадер их туда уже положил
+Config = sys.modules['config'].Config
+LyricsManager = sys.modules['lyrics_controller'].LyricsManager
+# download_file и get_icon_id возьмем из utils
+utils = sys.modules['utils']
+download_file = utils.download_file
+get_icon_id = utils.get_icon_id
 
 # ======================================================
 # КОНСТАНТЫ
@@ -29,68 +30,6 @@ from android.graphics import Typeface, Color
 DEX_URL = "https://github.com/Hazzz895/ExteraPluginsAssets/raw/refs/heads/main/lyrics/dex/classes.dex"
 CONTROLLER_CLASS_NAME = "com.pessdes.lyrics.components.lrclib.LyricsController"
 SHOW_LYRICS_ITEM_ID = 6767
-
-# ======================================================
-# УПРАВЛЕНИЕ НАСТРОЙКАМИ
-# ======================================================
-class Config:
-    def __init__(self):
-        self.path = os.path.join(ApplicationLoader.applicationContext.getExternalFilesDir(None).getAbsolutePath(), "lyrics_pro_config.json")
-        self.settings = self.load()
-
-    def load(self):
-        if os.path.exists(self.path):
-            try:
-                with open(self.path, "r") as f:
-                    return json.load(f)
-            except:
-                pass
-        return {
-            "text_size": 18,
-            "wallpaper_url": "",
-            "font_path": "",
-            "text_color": "#FFFFFF"
-        }
-
-    def save(self):
-        with open(self.path, "w") as f:
-            json.dump(self.settings, f)
-
-# ======================================================
-# ЛОГИКА КОНТРОЛЛЕРА
-# ======================================================
-class LyricsManager:
-    _instance = None
-    controller = None
-
-    @classmethod
-    def get_instance(cls):
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
-
-    def load_dex(self, plugin_name):
-        try:
-            lyrics_controller_class = None
-            try:
-                lyrics_controller_class = find_class(CONTROLLER_CLASS_NAME).getClass()
-            except:
-                pass
-
-            if not lyrics_controller_class:
-                response = requests.get(DEX_URL)
-                response.raise_for_status()
-                dex_bytes = response.content
-                app_class_loader = ApplicationLoader.applicationContext.getClassLoader()
-                dex_loader = InMemoryDexClassLoader(ByteBuffer.wrap(dex_bytes), app_class_loader)
-                lyrics_controller_class = dex_loader.loadClass(CONTROLLER_CLASS_NAME)
-
-            self.controller = lyrics_controller_class.getDeclaredMethod("getInstance").invoke(None)
-            self.controller.initPluginController(plugin_name)
-            return True
-        except Exception as e:
-            print(f"DEX Load Error: {e}")
-            return False
 
 # ======================================================
 # ОСНОВНОЙ КЛАСС ПЛАГИНА
@@ -151,24 +90,15 @@ class Plugin(BasePlugin):
             except:
                 pass
         elif key == "wallpaper_url" and value:
-            run_on_queue(lambda: self.download_wallpaper(value))
+            run_on_queue(lambda: self.update_wallpaper(value))
 
-    def download_wallpaper(self, url):
-        try:
-            response = requests.get(url, timeout=10)
-            response.raise_for_status()
-            cache_dir = ApplicationLoader.applicationContext.getExternalCacheDir()
-            wallpaper_file = File(cache_dir, "lyrics_wallpaper.jpg")
-            with open(wallpaper_file.getAbsolutePath(), "wb") as f:
-                f.write(response.content)
-            
-            if self.lyrics_manager.controller:
-                try:
-                    self.lyrics_manager.controller.setBackgroundPath(wallpaper_file.getAbsolutePath())
-                except:
-                    pass
-        except:
-            pass
+    def update_wallpaper(self, url):
+        path = download_file(url, "lyrics_bg.jpg")
+        if path and self.lyrics_manager.controller:
+            try:
+                self.lyrics_manager.controller.setBackgroundPath(path)
+            except:
+                pass
 
 # ======================================================
 # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ И ХУКИ
@@ -176,10 +106,6 @@ class Plugin(BasePlugin):
 def is_music():
     playing = get_media_controller().getInstance().getPlayingMessageObject()
     return playing and playing.isMusic()
-
-def get_icon_id(name):
-    context = get_last_fragment().getContext()
-    return context.getResources().getIdentifier(name, "drawable", context.getPackageName())
 
 class AudioPlayerAlertHook(MethodHook):
     def after_hooked_method(self, param):

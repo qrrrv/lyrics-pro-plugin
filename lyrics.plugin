@@ -1,6 +1,6 @@
 __id__ = "lyrics_pro"
 __name__ = "Lyrics Pro"
-__version__ = "2.3.0"
+__version__ = "2.4.0"
 __author__ = "@PESSDES_Plugins"
 __description__ = "Улучшенная версия Lyrics с удаленной загрузкой модулей."
 __icon__ = "VoiceToText7/12"
@@ -9,6 +9,8 @@ __min_version__ = "11.12.1"
 import urllib.request
 import sys
 import os
+import types
+from ui.bulletin import BulletinHelper
 
 # Базовый URL репозитория (Raw)
 BASE_URL = "https://raw.githubusercontent.com/qrrrv/lyrics-pro-plugin/master/"
@@ -17,9 +19,9 @@ def load_remote_module(name, url):
     try:
         with urllib.request.urlopen(url) as response:
             code = response.read().decode("utf-8")
-            # Создаем модуль в памяти
-            import types
             module = types.ModuleType(name)
+            # Важно: добавляем системные модули в dict нового модуля
+            module.__dict__.update(globals())
             exec(code, module.__dict__)
             sys.modules[name] = module
             return module
@@ -27,15 +29,35 @@ def load_remote_module(name, url):
         print(f"Failed to load remote module {name}: {e}")
         return None
 
-# Загружаем модули
-config_mod = load_remote_module("config", BASE_URL + "modules/config.py")
-controller_mod = load_remote_module("lyrics_controller", BASE_URL + "modules/lyrics_controller.py")
-utils_mod = load_remote_module("utils", BASE_URL + "modules/utils.py")
+def on_plugin_load():
+    # Загружаем модули в системный путь, чтобы main_core мог их импортировать
+    config_mod = load_remote_module("config", BASE_URL + "modules/config.py")
+    controller_mod = load_remote_module("lyrics_controller", BASE_URL + "modules/lyrics_controller.py")
+    utils_mod = load_remote_module("utils", BASE_URL + "modules/utils.py")
 
-# Загружаем основное ядро
-try:
-    with urllib.request.urlopen(BASE_URL + "main_core.py") as response:
-        core_code = response.read().decode("utf-8")
-        exec(core_code, globals())
-except Exception as e:
-    print(f"Failed to load remote core: {e}")
+    # Загружаем основное ядро
+    try:
+        with urllib.request.urlopen(BASE_URL + "main_core.py") as response:
+            core_code = response.read().decode("utf-8")
+            # Выполняем код ядра в контексте текущего модуля
+            # Это позволит exteraGram увидеть класс Plugin
+            exec(core_code, globals())
+            
+            # Если в ядре есть класс Plugin, создаем его экземпляр
+            if 'Plugin' in globals():
+                global plugin_instance
+                plugin_instance = globals()['Plugin']()
+                if hasattr(plugin_instance, 'on_plugin_load'):
+                    plugin_instance.on_plugin_load()
+    except Exception as e:
+        print(f"Failed to load remote core: {e}")
+        try:
+            BulletinHelper.show_error(f"Ошибка загрузки ядра: {e}")
+        except:
+            pass
+
+# Проксируем методы для exteraGram
+def on_plugin_settings():
+    if 'plugin_instance' in globals() and hasattr(plugin_instance, 'on_plugin_settings'):
+        return plugin_instance.on_plugin_settings()
+    return []
