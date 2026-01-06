@@ -9,12 +9,6 @@ __min_version__ = "11.12.1"
 import sys
 import os
 
-# Добавляем путь к модулям
-plugin_dir = os.path.dirname(__file__)
-modules_dir = os.path.join(plugin_dir, "modules")
-if modules_dir not in sys.path:
-    sys.path.append(modules_dir)
-
 from base_plugin import BasePlugin, MethodHook
 from client_utils import get_last_fragment, run_on_queue, get_media_controller
 from org.telegram.ui.ActionBar import ActionBarMenuItem
@@ -24,10 +18,24 @@ from java.lang import Boolean, Integer
 from android.graphics import Typeface, Color
 from ui.settings import Header, Text, Divider, Input
 
-# Импортируем наши модули
-from config import Config
-from lyrics_controller import LyricsManager
-from utils import download_file, get_icon_id
+# Исправленный импорт модулей для exteraGram
+import importlib.util
+
+def load_module(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+plugin_dir = os.path.dirname(__file__)
+config_mod = load_module("config", os.path.join(plugin_dir, "modules/config.py"))
+controller_mod = load_module("lyrics_controller", os.path.join(plugin_dir, "modules/lyrics_controller.py"))
+utils_mod = load_module("utils", os.path.join(plugin_dir, "modules/utils.py"))
+
+Config = config_mod.Config
+LyricsManager = controller_mod.LyricsManager
+download_file = utils_mod.download_file
+get_icon_id = utils_mod.get_icon_id
 
 SHOW_LYRICS_ITEM_ID = 6767
 
